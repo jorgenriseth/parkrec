@@ -88,18 +88,20 @@ def renumber_imfile(imfile: Path, offset: int) -> str:
     return f"IM_{int(imfile.stem.split('_')[1]) + offset * 2048:04d}"
 
 
-def find_timestamp(x: Path) -> str:
-    """TODO: Correct this function."""
-    # TODO: Not correct timestamp.
-    return x.stem.split("__")[1]
+def find_timestamp(study_dir: Path) -> str:
+    study_data_path = study_dir / "DICOM" / "DICOM"
+    first_imfile, _ = next(study_imfiles(study_data_path))
+    with pydicom.dcmread(first_imfile) as f:
+        timestamp = f.StudyTime
+    return timestamp
 
 
-def study_imfiles(study_path: Path) -> Iterator[Path]:
+def study_imfiles(study_data_path: Path) -> Iterator[Path]:
     return chain(
-        study_level_imfiles(study_path),
+        study_level_imfiles(study_data_path),
         *(
             subdirectory_imfiles(subdir)
-            for subdir in filter(is_image_subdirectory, study_path.iterdir())
+            for subdir in filter(is_image_subdirectory, study_data_path.iterdir())
         ),
     )
 
@@ -135,14 +137,16 @@ def sorted_study_iterator(sorted_dir: Path) -> Iterator[Path]:
 def sorted_study_metadata(study_path):
     study_metadata = {}
     for path in filter(lambda x: x.is_dir(), study_path.iterdir()):
-        print(path)
-        protocol_filelist = list(
-            map(lambda x: int(x.stem.split("_")[1]), filter(is_imfile, path.iterdir()))
-        )
+        protocol_filelist = list(filter(is_imfile, path.iterdir()))
+        label_list = list(map(lambda x: int(x.stem.split("_")[1]), protocol_filelist))
+        with pydicom.dcmread(protocol_filelist[0]) as f:
+            timestamp = f.SeriesTime
+        
         study_metadata[path.stem] = {
-            "min": min(protocol_filelist),
-            "max": max(protocol_filelist),
+            "min": min(label_list),
+            "max": max(label_list),
             "num_files": len(protocol_filelist),
+            "series_time": timestamp
         }
     return study_metadata
 
@@ -166,4 +170,4 @@ if __name__ == "__main__":
         "WIP DelRec - WIP 2beatpause1mm 3000 HR 21": "Look-Locker",
         "WIP 07mmTE565 3D TSE": "T2",
     }
-    main(inputdir, outputdir, sequences, add_metadata=False)
+    main(inputdir, outputdir, sequences, add_metadata=True)
