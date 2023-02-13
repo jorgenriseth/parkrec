@@ -1,0 +1,52 @@
+from pathlib import Path
+
+import nibabel
+import numpy as np
+
+
+def is_not_template(p: Path) -> bool:
+    return p.suffix == ".mgz" and p.stem != "template"
+
+
+def normalize_image(
+    image_path: Path, ref_mask: np.ndarray, ref_transform: np.ndarray, output_dir: Path
+) -> Path:
+    image = nibabel.load(image_path)
+    image_affine = image.affine
+    assert np.allclose(
+        ref_transform, image_affine
+    ), "Poor match between reference and image-transform."
+    image_data = image.get_fdata()
+
+    normalized_image_data = image_data / np.median(image_data[ref_mask])
+    normalized_image = nibabel.Nifti1Image(normalized_image_data, ref_transform)
+
+    newfile = output_dir / image_path.name
+    nibabel.save(normalized_image, newfile)
+    return newfile
+
+
+def normalize_subject_images(subject_dir: Path) -> Path:
+    registered_dir = subject_dir / "REGISTERED"
+    output_dir = subject_dir / "NORMALIZED"
+    refroi_path = subject_dir / "mri" / "refroi.mgz"
+    if not refroi_path.exists():
+        raise OSError(
+            f"{refroi_path} does not exists. Remember to create reference ROI using freeview."
+        )
+    output_dir.mkdir(exist_ok=True)
+
+    refroi = nibabel.load(refroi_path)
+    refroi_affine = refroi.affine
+    refroi_mask = refroi.get_fdata().astype(bool)
+
+    images = sorted(filter(is_not_template, registered_dir.iterdir()))
+    for imagepath in images:
+        normalize_image(imagepath, refroi_mask, refroi_affine, output_dir)
+
+    return output_dir
+
+
+if __name__ == "__main__":
+    subject_dir = Path("FREESURFER/PAT_001")
+    normalize_subject_images(subject_dir)

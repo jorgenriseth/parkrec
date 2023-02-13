@@ -59,7 +59,7 @@ def create_study_filemap(
     date = datetime.strptime(date_dir.stem, "%Y_%m_%d").strftime("%Y%m%d")
     timestamp = find_timestamp(study_dir)
     study_target = output_dir / patient / f"{date}_{timestamp}"
-    print(f"Entering {study_data}\n")  # TODO: Use python logging instead.
+    print(f"Entering {study_data}")  # TODO: Use python logging instead.
     return filemap_study(study_data, study_target, sequences)
 
 
