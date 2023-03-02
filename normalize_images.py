@@ -2,6 +2,9 @@ from pathlib import Path
 
 import nibabel
 import numpy as np
+import logging 
+
+logger = logging.getLogger(__name__)
 
 
 def is_not_template(p: Path) -> bool:
@@ -32,7 +35,8 @@ def normalize_subject_images(subject_dir: Path) -> Path:
     refroi_path = subject_dir / "mri" / "refroi.mgz"
     if not refroi_path.exists():
         raise OSError(
-            f"{refroi_path} does not exists. Remember to create reference ROI using freeview."
+            f"""{refroi_path} does not exists.
+            Remember to create reference ROI using freeview."""
         )
     output_dir.mkdir(exist_ok=True)
 
@@ -42,11 +46,17 @@ def normalize_subject_images(subject_dir: Path) -> Path:
 
     images = sorted(filter(is_not_template, registered_dir.iterdir()))
     for imagepath in images:
+        logger.info("Normalizing image {imagepath}")
         normalize_image(imagepath, refroi_mask, refroi_affine, output_dir)
 
     return output_dir
 
 
 if __name__ == "__main__":
-    subject_dir = Path("FREESURFER/PAT_001")
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("patientid", help="Patient ID on the form PAT_###")
+    args = parser.parse_args()
+
+    subject_dir = Path("DATA/") / args.patientid
     normalize_subject_images(subject_dir)

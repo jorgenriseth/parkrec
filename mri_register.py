@@ -55,7 +55,16 @@ def patient_register(subject_dir: Path) -> Path:
 
 
 def volume_register(input_volume: Path, template: Path, output_volume: Path, output_lta: Path) -> None:
-    register_command = f"mri_robust_register --mov {input_volume} --dst {template} --lta {output_lta} --mapmov {output_volume} --satit --subsample 200"
+    register_command = f"mri_robust_register \
+            --mov {input_volume} \
+            --dst {template} \
+            --lta {output_lta} \
+            --mapmov {output_volume} \
+            --satit  \
+            --iscale  \
+            --subsample 200  \
+        "
+    logger.info(register_command)
     subprocess.run(register_command, shell=True)
 
 
@@ -69,5 +78,3 @@ if __name__ == "__main__":
 
     patient_create_template(patpath)
     patient_register(patpath)
-
-    
