@@ -1,5 +1,6 @@
 #!/usr/bin/env/python
 import json
+import logging 
 from functools import partial
 from itertools import chain, repeat
 from datetime import datetime
@@ -9,6 +10,8 @@ from typing import Tuple, Iterator, Dict
 
 import shutil
 import pydicom
+
+logger = logging.getLogger(__name__)
 
 
 def main(

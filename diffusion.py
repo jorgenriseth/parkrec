@@ -377,8 +377,8 @@ if __name__ == "__main__":
         diffusion_tensor = Function(diffusiontensor_Space)
         hdf.read(diffusion_tensor, '/DTI')
     except:
-        print("No DTI found, using D=1e-4 mm^2/s")
-        mean_diffusivity = Constant(1e-4)
+        print("No DTI found, using D=1.3e-3 mm^2/s, taken from https://pubmed.ncbi.nlm.nih.gov/32514105/")
+        mean_diffusivity = Constant(1.3e-3)
         diffusion_tensor = None
 
 

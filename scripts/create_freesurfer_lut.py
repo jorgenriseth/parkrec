@@ -2,7 +2,6 @@ import os
 import re
 from typing import Dict
 from pathlib import Path
-import json
 
 import pandas as pd
 import dataclasses
@@ -15,7 +14,7 @@ class LutEntry:
 
 
 def find_lut_entry(line):
-    m = re.match("^(\d+)\s+([a-zA-Z-]+)\s.", line)
+    m = re.match("^(\d+)\s+([_\da-zA-Z-]+)\s.", line)
     if m is None:
         return None
     return LutEntry(index=int(m.group(1)), description=m.group(2))
@@ -34,5 +33,6 @@ if __name__ == "__main__":
 
     df = pd.DataFrame({"lut_index": indices, "description": descriptions})
     df.set_index("lut_index")["description"].to_json(
-        "DATA/freesurfer_lut.json", orient="index", indent=4
+        "DATA/freesurfer_lut.json", indent=4
     )
+    df.to_csv("DATA/freesurfer_lut.csv", index=False)

@@ -20,7 +20,10 @@ sequences = {
     "WIP PDT1_3D 1mm": "T1",
     "WIP 07mmTE565 3D TSE": "T2",
     "WIP T2W 3D TSE TE565": "T2",
+    "WIP DelRec - LookLocker 1mm 3000 HR 21": "LookLocker",
+    "WIP DelRec - WIP 2beatpause1mm 3000 HR 21": "LookLocker"
 }
+
 
 logger.info(f"Converting {args.patientid} DICOM-files to nii")
 patient_convert(inputdir, outputdir, args.patientid, sequences)

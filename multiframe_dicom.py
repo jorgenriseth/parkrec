@@ -10,6 +10,7 @@ import shutil
 
 logger = logging.getLogger(__name__)
 
+
 def is_datedir(dirpath: Path) -> bool:
     match = re.search("[0-9]{4}_[0-9]{2}_[0-9]{2}", dirpath.stem)
     if match is None:
@@ -35,22 +36,30 @@ def patient_convert(inputdir, outputdir, patient: str, sequences) -> None:
                             outputdir / patientdir.stem / "VOLUMES" / f"{date}_{timestamp}"
                         )
                         study_target.mkdir(parents=True, exist_ok=True)
-                    conversion_command = f'dcm2niix -f {seq_label} -o "{tempdir}" "{path}/DICOM"',
-                    logging.debug(f"Run: {conversion_command}")
+                        #(study_target / "LookLocker").mkdir(exist_ok=True)
+                    conversion_command = f'\
+                        dcm2niix -f {seq_label} -o "{tempdir}" "{path}/DICOM"\
+                        1>> {tempdir}/log.txt'.strip("\t"),
+                    logger.info(f"{conversion_command}")
                     subprocess.run(
-                        f'dcm2niix -f {seq_label} -o "{tempdir}" "{path}/DICOM"',
+                        conversion_command,
                         shell=True,
                     )
 
             for nii_file in filter(is_niifile, tempdir.iterdir()):
-                nii_file.rename(f"{study_target}/{nii_file.name}")
+                if "LookLocker" in nii_file.name:
+                    looklocker_target = (outputdir / patientdir.stem / "VOLUMES/LookLocker") / f"{date}_{timestamp}"
+                    looklocker_target.mkdir(exist_ok=True, parents=True)
+                    nii_file.rename(looklocker_target / nii_file.name)
+                else: 
+                    nii_file.rename(f"{study_target}/{nii_file.name}")
                 # TODO: Probably don't need this.
-                subprocess.run(
-                    f'mri_convert \
-                        "{nii_file}" \
-                        "{study_target}/{nii_file.stem}.mgz"',
-                    shell=True,
-                )
+                # subprocess.run(
+                #     f'mri_convert \
+                #         "{nii_file}" \
+                #         "{study_target}/{nii_file.stem}.mgz"',
+                #     shell=True,
+                # )
 
 def is_niifile(p: Path) -> bool:
     return p.suffix == ".nii"
@@ -82,6 +91,8 @@ if __name__ == "__main__":
         "WIP PDT1_3D 1mm": "T1",
         "WIP 07mmTE565 3D TSE": "T2",
         "WIP T2W 3D TSE TE565": "T2",
+        "WIP DelRec - LookLocker 1mm 3000 HR 21": "LookLocker",
+        "WIP DelRec - WIP 2beatpause1mm 3000 HR 21": "LookLocker"
     }
 
     patient_convert(inputdir, outputdir, patient, sequences)

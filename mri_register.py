@@ -21,7 +21,7 @@ def patient_create_template(subject_dir: Path) -> Path:
     volumes = sorted(filter(is_T1_mgz, (subject_dir / "RESAMPLED").iterdir()))
     template = subject_dir / "REGISTERED" / "template.mgz"
     template.parent.mkdir(exist_ok=True)
-    if template.existsm():
+    if template.exists():
         return template
 
     template_command = f"mri_robust_template \
@@ -44,28 +44,21 @@ def patient_register(subject_dir: Path) -> Path:
     lta_dir.mkdir(exist_ok=True)
 
     for volume in volumes:
-        volume_register(
-            volume,
-            output_dir / "template.mgz",
-            output_dir / volume.name,
-            lta_dir / volume.with_suffix(".lta").name
-        )
-
+        register_command = f"mri_robust_register \
+                --mov {volume} \
+                --dst {output_dir / 'template.mgz'} \
+                --lta {lta_dir / volume.with_suffix('.lta').name} \
+                --mapmov {output_dir / volume.name} \
+                --iscale \
+                --satit  \
+                --iscale  \
+                --maxit 10 \
+                --subsample 200  \
+            "
+        logger.info(register_command)
+        subprocess.run(register_command, shell=True)
     return output_dir
 
-
-def volume_register(input_volume: Path, template: Path, output_volume: Path, output_lta: Path) -> None:
-    register_command = f"mri_robust_register \
-            --mov {input_volume} \
-            --dst {template} \
-            --lta {output_lta} \
-            --mapmov {output_volume} \
-            --satit  \
-            --iscale  \
-            --subsample 200  \
-        "
-    logger.info(register_command)
-    subprocess.run(register_command, shell=True)
 
 
 if __name__ == "__main__":

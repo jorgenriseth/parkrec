@@ -3,7 +3,6 @@ import subprocess
 import logging
 from pathlib import Path
 
-from mri_register import volume_register
 
 parser = argparse.ArgumentParser()
 parser.add_argument("patientid", help="Patient ID on the form PAT_###")
