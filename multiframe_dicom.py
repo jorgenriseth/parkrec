@@ -5,8 +5,10 @@ import subprocess
 import pydicom
 import logging
 from typing import Optional, Dict
-from datetime import datetime
-import shutil
+from datetime import datetime, time
+import json
+
+from settings import Settings, patient_data_settings, DICOMSettings
 
 logger = logging.getLogger(__name__)
 
@@ -18,51 +20,75 @@ def is_datedir(dirpath: Path) -> bool:
     return True
 
 
-def patient_convert(inputdir, outputdir, patient: str, sequences) -> None:
-    patientdir = inputdir / patient
-    for datedir in filter(is_datedir, patientdir.iterdir()):
-        for studydir in datedir.iterdir():
-            date = datetime.strptime(datedir.stem, "%Y_%m_%d").strftime("%Y%m%d")
-            timestamp = None  # Is set after reading first file of interest.
-            tempdir = Path(f"/tmp/parkrec_convert-{studydir.stem}-{uuid4()}")
-            tempdir.mkdir(parents=True)
-            for path in studydir.iterdir():
-                seq_label = search_for_relevant_sequence(path, sequences)
-                if seq_label is not None:
-                    imfile = path / "DICOM/IM_0002"  # FIXME: Potential bugsource.
-                    if timestamp is None:
-                        timestamp = find_timestamp(imfile)
-                        study_target = (
-                            outputdir / patientdir.stem / "VOLUMES" / f"{date}_{timestamp}"
-                        )
-                        study_target.mkdir(parents=True, exist_ok=True)
-                        #(study_target / "LookLocker").mkdir(exist_ok=True)
-                    conversion_command = f'\
-                        dcm2niix -f {seq_label} -o "{tempdir}" "{path}/DICOM"\
-                        1>> {tempdir}/log.txt'.strip("\t"),
-                    logger.info(f"{conversion_command}")
-                    subprocess.run(
-                        conversion_command,
-                        shell=True,
-                    )
+def patient_dicom2nii(
+    patientdir: Path,
+    t1dir: Path,
+    t2dir: Path,
+    looklockerdir: Path,
+    sequences: dict[str, str],
+    dtidir: Optional[Path] = None,
+):
+    for idx, studydir in enumerate(study_iterator(patientdir)):
+        dicom2nii(studydir, t1dir, "T1", sequences["T1"])
+        dicom2nii(studydir, looklockerdir, "LookLocker", sequences["LookLocker"])
+        if idx == 0:
+            dicom2nii(studydir, t2dir, "T2", sequences["T2"])
+        if dtidir is not None:
+            raise NotImplementedError("Need to find correct DTI sequence.")
 
-            for nii_file in filter(is_niifile, tempdir.iterdir()):
-                if "LookLocker" in nii_file.name:
-                    looklocker_target = (outputdir / patientdir.stem / "VOLUMES/LookLocker") / f"{date}_{timestamp}"
-                    looklocker_target.mkdir(exist_ok=True, parents=True)
-                    nii_file.rename(looklocker_target / nii_file.name)
-                else: 
-                    nii_file.rename(f"{study_target}/{nii_file.name}")
-                # TODO: Probably don't need this.
-                # subprocess.run(
-                #     f'mri_convert \
-                #         "{nii_file}" \
-                #         "{study_target}/{nii_file.stem}.mgz"',
-                #     shell=True,
-                # )
+
+def dicom2nii(studydir, outputdir, label, patterns):
+    outputdir.mkdir(exist_ok=True, parents=True)
+    tempdir = Path(f"/tmp/parkrec_convert-{studydir.stem}-{uuid4()}")
+    tempdir.mkdir()
+
+    path = find_dicomdir(studydir, patterns)
+    conversion_command = f'\
+        dcm2niix -f {label} -o "{tempdir}" "{path}/DICOM"\
+        1>> {tempdir}/log.txt'.strip(
+        "\t"
+    )
+    subprocess.run(conversion_command, shell=True)
+
+    for nii_file in filter(is_niifile, tempdir.iterdir()):
+        datedir = studydir.parent
+        with open(nii_file.with_suffix(".json")) as f:
+            info = json.load(f)
+        timestamp = datetime.strptime(info["AcquisitionTime"], "%H:%M:%S.%f").strftime(
+            "%H%M%S"
+        )
+        outputname = f"{datedir.stem.replace('_', '')}_{timestamp}"
+
+        if "LookLocker" in nii_file.stem:
+            outputname += f"_t{info['TriggerDelayTime']}"
+        nii_file.rename(outputdir / f"{outputname}.nii")
+
+
+def find_dicomdir(studydir: Path, patterns: list[str]) -> Path:
+    paths = sorted(filter(lambda x: has_pattern(x, patterns), studydir.glob("DICOM_*")))
+    if len(paths) == 0:
+        raise ValueError(f"No DICOM directory found in {studydir} matching {patterns}.")
+    if len(paths) > 1:
+        # TODO: Verify behaviour.
+        print(paths)
+        return paths[-1]
+        raise ValueError(
+            f"Multiple DICOM directories found in {studydir} matching {patterns}: \
+            {paths}"
+        )
+    return paths[0]
+
+
+def has_pattern(dirname, patterns):
+    for pattern in patterns:
+        if pattern in dirname.stem:
+            return True
+    return False
+
 
 def is_niifile(p: Path) -> bool:
     return p.suffix == ".nii"
+
 
 def search_for_relevant_sequence(
     path: Path, sequences: Dict[str, str]
@@ -76,28 +102,57 @@ def search_for_relevant_sequence(
     return None
 
 
-def find_timestamp(dicom_file: Path) -> Optional[str]:
+def find_timestamp_from_dicom(dicom_file: Path) -> Optional[str]:
     with pydicom.dcmread(dicom_file) as f:
         timestamp = f.StudyTime
     return timestamp
 
 
+def study_iterator(patient_dir: Path) -> list[Path]:
+    return [
+        x
+        for date in sorted(filter(is_datedir, patient_dir.iterdir()))
+        for x in sorted(date.iterdir())
+    ]
+
+
 if __name__ == "__main__":
-    inputdir = Path("GRIP")
-    outputdir = Path("GRIP_SORTED")
-    patient = "PAT_001"
-    sequences = {
-        "WIP PDT1_3D 08mm": "T1",
-        "WIP PDT1_3D 1mm": "T1",
-        "WIP 07mmTE565 3D TSE": "T2",
-        "WIP T2W 3D TSE TE565": "T2",
-        "WIP DelRec - LookLocker 1mm 3000 HR 21": "LookLocker",
-        "WIP DelRec - WIP 2beatpause1mm 3000 HR 21": "LookLocker"
-    }
+    from argparse import ArgumentParser
 
-    patient_convert(inputdir, outputdir, patient, sequences)
+    parser = ArgumentParser()
+    parser.add_argument("patientid", type=str, help="Patient ID on format PAT_XXX")
+    patient = parser.parse_args().patientid
 
-    # Cleanup
-    for path in Path("/tmp").iterdir():
-        if "parkrec_convert" in path.stem:
-            shutil.rmtree(path)
+    settings = DICOMSettings(
+        patient_dicompath=Settings().rawdata / patient,
+        paths=patient_data_settings(Settings().datapath, patient),
+    )
+
+    patient_dicom2nii(
+        settings.patient_dicompath,
+        settings.paths.t1raw,
+        settings.paths.t2,
+        settings.paths.looklocker,
+        settings.sequences,
+    )
+
+    # dicom2nii(settings.raw, settings.paths.t2, "T2", settings.sequences["T2"])
+
+    # inputdir = Path("GRIP")
+    # outputdir = Path("GRIP_SORTED")
+    # patient = "PAT_001"
+    # sequences = {
+    #     "WIP PDT1_3D 08mm": "T1",
+    #     "WIP PDT1_3D 1mm": "T1",
+    #     "WIP 07mmTE565 3D TSE": "T2",
+    #     "WIP T2W 3D TSE TE565": "T2",
+    #     "WIP DelRec - LookLocker 1mm 3000 HR 21": "LookLocker",
+    #     "WIP DelRec - WIP 2beatpause1mm 3000 HR 21": "LookLocker"
+    # }
+
+    # patient_convert(inputdir, outputdir, patient, sequences)
+
+    # # Cleanup
+    # for path in Path("/tmp").iterdir():
+    #     if "parkrec_convert" in path.stem:
+    #         shutil.rmtree(path)
