@@ -1,7 +1,6 @@
-import dataclasses
 from pathlib import Path
-from pydantic import BaseSettings, BaseModel
-from string import Template
+
+from pydantic import BaseModel, BaseSettings
 
 
 class Settings(BaseSettings):
@@ -10,6 +9,8 @@ class Settings(BaseSettings):
 
 
 class PatientDataSettings(BaseModel):
+    dicompath: Path
+    patient_root: Path
     t1raw: Path
     resampled: Path
     registered: Path
@@ -21,30 +22,35 @@ class PatientDataSettings(BaseModel):
     fenics: Path
 
 
-def patient_data_settings(datapath: Path, patientid: str) -> PatientDataSettings:
-    patient_path = Path(datapath) / patientid
+def patient_data_default_settings():
+    return dict(
+        t1raw="T1",
+        resampled="RESAMPLED",
+        registered="REGISTERED",
+        normalized="NORMALIZED",
+        lta="LTA",
+        looklocker="LOOKLOCKER",
+        t2="T2",
+        dti="DTI",
+        concentrations="CONCENTRATIONS",
+        fenics="FENICS",
+    )
+
+
+def patient_data_settings(patientid: str) -> PatientDataSettings:
+    default = patient_data_default_settings()
+    patient_path = Settings().datapath / patientid
     return PatientDataSettings(
-        t1raw=patient_path / "T1",
-        resampled=patient_path / "RESAMPLED",
-        registered=patient_path / "NORMALIZED",
-        lta=patient_path / "LTA",
-        looklocker=patient_path / "LOOKLOCKER",
-        t2=patient_path / "T2",
-        dti=patient_path / "DTI",
-        concentrations=patient_path / "CONCENTRATIONS",
-        fenics=patient_path / "FENICS",
+        dicompath=Settings().rawdata / patientid,
+        patient_root=patient_path,
+        **{data: patient_path / datadir for data, datadir in default.items()}
     )
 
 
 class DICOMSettings(BaseModel):
-    patient_dicompath: Path
     paths: PatientDataSettings
-    sequences: dict[str, str] = {
-        "T1": ["WIP PDT1_3D 08mm", "WIP PDT1_3D 1mm"],
-        "T2": ["WIP 07mmTE565 3D TSE", "WIP T2W 3D TSE TE565"],
-        "LookLocker": [
-            "WIP DelRec - LookLocker 1mm 3000 HR 21",
-            "WIP DelRec - WIP 2beatpause1mm 3000 HR 21",
-        ],
-        "DTI": None
+    patterns: dict[str, str] = {
+        "T1": r"(DICOM_\d+_\d+[_ ])(.*(PDT1_3D).*)",
+        "T2": r"(DICOM_\d+_\d+[_ ])(.*(TE565).*)",
+        "LookLocker": r"(DICOM_\d+_3[_ ])(.*(LookLocker|2beatpause).*)",
     }
