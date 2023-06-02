@@ -58,6 +58,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("patientid", type=str)
     parser.add_argument("concentration_dirname", type=str)
+    parser.add_argument("--outputname", type=str, default="concentrations.csv")
     args = parser.parse_args()
 
     patdir = Path("DATA") / args.patientid
@@ -82,7 +83,7 @@ if __name__ == "__main__":
             **{str(pd.to_datetime(timestamp)): pd.Series(im.reshape(-1), dtype=float)}
         )
     print(df.head())
-    logger.info(f"Saving dataframe to {statsdir / 'concentrations.csv'} ...")
-    df.to_csv(statsdir / "concentrations.csv", index=False)
-    df.head(10).to_csv(statsdir / "concentrations_test.csv", index=False)
+    logger.info(f"Saving dataframe to {statsdir / args.outputname} ...")
+    df.to_csv(statsdir / args.outputname, index=False)
+    df.head(10).to_csv(statsdir / f"concentrations_test.csv", index=False)
     logger.info("Done.")

@@ -30,7 +30,15 @@ def read_concentration_data(filepath, funcname="cdata") -> List[df.Function]:
 
 
 if __name__ == "__main__":
-    timevec, data = read_concentration_data("DATA/PAT_002/FENICS/cdata_32.hdf")
+
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("patientid", help="Patient ID on the form PAT_###")
+    parser.add_argument("resolution", help="SVMTK mesh resolution.", type=int)
+    args = parser.parse_args()
+
+    datapath =f"DATA/{args.patientid}/FENICS/cdata_{int(args.resolution)}.hdf"
+    timevec, data = read_concentration_data(datapath)
     u0 = data[0].copy(deepcopy=True)
     u_interp = u0.copy(deepcopy=True)
     interpolator = vectordata_interpolator(data, timevec)
@@ -57,7 +65,7 @@ if __name__ == "__main__":
 
     u = df.Function(V)
     u.assign(u0)
-    storage = FenicsStorage("DATA/PAT_002/FENICS/cdata_32.hdf", "a")
+    storage = FenicsStorage(datapath, "a")
     storage.write_function(u, "diffusion", overwrite=True)
 
 

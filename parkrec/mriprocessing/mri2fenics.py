@@ -1,6 +1,7 @@
 import dolfin as df
 # from dolfin_adjoint import *
-from datetime import datetime
+import datetime
+# from datetime import datetime
 import nibabel
 import numpy
 from nibabel.affines import apply_affine
@@ -40,8 +41,14 @@ def read_image(filename, functionspace, data_filter=None):
 
     return c_data
 
-def get_timestamp(p: Path) -> float:
-        return datetime.strptime(p.stem, "%Y%m%d_%H%M%S")
+def image_timestamp(p: Path) -> datetime.datetime:
+    return datetime.datetime.strptime(p.stem, "%Y%m%d_%H%M%S")
+
+def injection_timestamp(injection_time_file: Path) -> datetime:
+    with open(injection_time_file, "r") as f:
+        time_string = f.read()
+    return datetime.datetime.strptime(time_string, "%H.%M.%S").time()
+
 
 def fenicsstorage2xdmf(filepath, funcname: str, subnames: str | List[str]) -> None:
     file = FenicsStorage(filepath, "r")
@@ -74,9 +81,14 @@ if __name__ == "__main__":
     concentration_data = sorted((patientdir / args.concentrationdir).iterdir())#[1:]
     outfile = FenicsStorage(str(output), "w")
     outfile.write_domain(mesh)
+
+    start_date = image_timestamp(concentration_data[0]).date()
+    injection_time_of_day = injection_timestamp(patientdir / "injection_time.txt")
+    t0 = datetime.datetime.combine(start_date, injection_time_of_day)
+
     for cfile in concentration_data:
         c_data_fenics = read_image(filename=cfile, functionspace=V, data_filter=None)
-        ti = (get_timestamp(cfile) - get_timestamp(concentration_data[0])).total_seconds()
+        ti = max(0, (image_timestamp(cfile) - t0).total_seconds())
         outfile.write_checkpoint(c_data_fenics, name="cdata", t=ti)
     outfile.close()
     fenicsstorage2xdmf(outfile.filepath, "cdata", "cdata")

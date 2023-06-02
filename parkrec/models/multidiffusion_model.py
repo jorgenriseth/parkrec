@@ -56,6 +56,7 @@ def compartment_form(
     alpha: float,
     P: float, 
     compartments: List[str],
+    dt: float
 ) -> df.Form:
     j = compartments[idx_j]
     sj = sum(
@@ -76,6 +77,7 @@ def multicomp_diffusion_form(
     coefficients: Dict[str, Any],
     c0: df.Function,
     compartments: List[str],
+    dt: float
 ) -> df.Form:
     dx = df.Measure("dx", domain=V.mesh())
     u = df.TrialFunction(V)
@@ -87,7 +89,7 @@ def multicomp_diffusion_form(
     return (
         sum(
             [
-                compartment_form(idx_j, u, v, c0, D, phi, alpha, P,compartments)
+                compartment_form(idx_j, u, v, c0, D, phi, alpha, P, compartments, dt)
                 for idx_j, _ in enumerate(compartments)
             ]
         )
@@ -99,34 +101,32 @@ def get_default_coefficients() -> Dict[str, Any]:
     return {
         "porosity": {
             "ecs": 0.14,
-            "pvs": 0.05,
+            "pvs": 0.01,
         },
         "diffusion_coefficient": {
-            "ecs": 1.65e-4,
-            "pvs": 1.3e-3
+            "ecs": 3.4e-4,
+            "pvs": 3.4e-3
         },
         "alpha": 5.0,
-        "permeability": 1e-4,
+        "permeability": 8.3e-5,
     }
 
-if __name__ == "__main__":
-    compartments = ["ecs", "pvs"]
-    # FIXME: Get proper values here.
-    coefficients = get_default_coefficients()
 
-    data_file = "DATA/PAT_002/FENICS/cdata_32.hdf"
-    logger.info(f"Reading data from {data_file}")
-    timevec, data = read_concentration_data(data_file)
+def main(compartments, coefficients, inputfile, outputfile=None):
+    if outputfile is None:
+        outputfile = Path(inputfile)
+    logger.info(f"Reading data from {inputfile}")
+    timevec, data = read_concentration_data(inputfile)
     interpolator = vectordata_interpolator(data, timevec)
     c0 = data[0].copy(deepcopy=True)
 
     domain = c0.function_space().mesh()
-    el = read_function_element(data_file, "cdata")
+    el = read_function_element(inputfile, "cdata")
     element = df.MixedElement([el] * 2)
     V = df.FunctionSpace(domain, element)
 
     dt = 3600
-    T = timevec[-1]  # FIXME: Only here for testing, switch to timevec[-1].
+    T = timevec[-1] 
     time = TimeKeeper(dt=dt, endtime=T)
 
     # Define boundary conditions
@@ -136,7 +136,7 @@ if __name__ == "__main__":
     }
     phi = coefficients["porosity"]
     phi_tot = sum(phi.values())
-    for key, val in u_interp.items():
+    for val in u_interp.values():
         val.vector()[:] = (1.0 / phi_tot) * interpolator(0.0)
 
     boundary_data = {
@@ -148,14 +148,14 @@ if __name__ == "__main__":
 
     # Define variational problem
     u0 = assign_mixed_function(u_interp, V, compartments)
-    F = multicomp_diffusion_form(V, coefficients, u0, compartments)
+    F = multicomp_diffusion_form(V, coefficients, u0, compartments, dt)
     a = df.lhs(F)
     l = df.rhs(F)
     A = df.assemble(a)
 
     u = df.Function(V)
     u.assign(u0)
-    storage = FenicsStorage("DATA/PAT_002/FENICS/cdata_32.hdf", "a")
+    storage = FenicsStorage(outputfile, "a")
     storage.write_function(u, "multidiffusion", overwrite=True)
  
     logger.info("Starting time loop...")
@@ -178,7 +178,23 @@ if __name__ == "__main__":
     df.MPI.comm_world.barrier()
     if df.MPI.comm_world.rank == 0:
         logger.info(f"Elapsed time in loop: {toc - tic:.2f} seconds.")
-    file = FenicsStorage(storage.filepath, "r")
+    return storage.filepath
+
+
+if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("patientid", help="Patient ID on the form PAT_###")
+    parser.add_argument("resolution", help="SVMTK mesh resolution.", type=int)
+    args = parser.parse_args()
+    data_file = f"DATA/{args.patientid}/FENICS/cdata_{args.resolution}.hdf"
+
+    compartments = ["ecs", "pvs"]
+    coefficients = get_default_coefficients()
+
+    results_path = main(compartments, coefficients, data_file) 
+
     logger.info("Writing XDMF files for each compartment.")
+    file = FenicsStorage(results_path, "r")
     file.to_xdmf("multidiffusion", compartments)
     file.close()

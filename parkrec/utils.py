@@ -144,9 +144,11 @@ if __name__ == "__main__":
         "WIP 07mmTE565 3D TSE": "T2",
         "WIP T2W 3D TSE TE565": "T2",
     }
-    #main(inputdir, outputdir, sequences, add_metadata=True)
+    # main(inputdir, outputdir, sequences, add_metadata=True)
 
-    filemap = create_study_filemap(inputdir / "PAT_002" / "2023_02_13" / "Zi_121304", outputdir, sequences)
+    filemap = create_study_filemap(
+        inputdir / "PAT_002" / "2023_02_13" / "Zi_121304", outputdir, sequences
+    )
 
     for src, dest in filemap.items():
         dest.parent.mkdir(exist_ok=True, parents=True)

@@ -10,20 +10,23 @@ from uuid import uuid4
 
 import pydicom
 
-from settings import DICOMSettings, Settings, patient_data_settings
+from parkrec.settings import DICOMSettings, patient_data_settings
+from parkrec.filters import is_datedir, is_niifile
+
 
 logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.DEBUG)
 
 
 def patient_dicom2nii(
-    patientdir: Path,
+    dicom_patientdir: Path,
     t1dir: Path,
     t2dir: Path,
     looklockerdir: Path,
     patterns: dict[str, str],
     dtidir: Optional[Path] = None,
 ):
-    for idx, studydir in enumerate(study_iterator(patientdir)):
+    for idx, studydir in enumerate(study_iterator(dicom_patientdir)):
         dicom2nii(studydir, t1dir, "T1", patterns["T1"])
         dicom2nii(studydir, looklockerdir, "LookLocker", patterns["LookLocker"])
         if idx == 0:
@@ -32,60 +35,46 @@ def patient_dicom2nii(
             raise NotImplementedError("Need to find correct DTI sequence.")
 
 
-def dicom2nii(studydir, outputdir, label, pattern):
+def dicom2nii(dicom_studydir: Path, outputdir: Path, label: str, pattern: str):
     outputdir.mkdir(exist_ok=True, parents=True)
-    tempdir = Path(f"/tmp/parkrec_convert-{studydir.stem}-{uuid4()}")
+    tempdir = Path(f"/tmp/parkrec_convert-{dicom_studydir.stem}-{uuid4()}")
     tempdir.mkdir()
 
-    path = find_sequencedir(studydir, pattern)
-    conversion_command = f'\
-        dcm2niix -f {label} -o "{tempdir}" "{path}/DICOM"\
-        1>> {tempdir}/log.txt \
-    '.strip(
-        "\t"
+    path = find_dicom_sequence_dir(dicom_studydir, pattern)
+    cmd = (
+        "dcm2niix"
+        + f" -f {label}"
+        + f" -o '{tempdir}'"
+        + f" '{path}/DICOM'"
+        + f" 1>> '{tempdir}/log.txt'"
     )
-    logger.info(f"Running conversion command: {conversion_command}")
-    subprocess.run(conversion_command, shell=True)
+    logger.info(f"Running conversion command: {cmd}")
+    subprocess.run(cmd, shell=True).check_returncode()
 
     for nii_file in filter(is_niifile, tempdir.iterdir()):
-        datedir = studydir.parent
+        datedir = dicom_studydir.parent
         with open(nii_file.with_suffix(".json")) as f:
             info = json.load(f)
         timestamp = datetime.strptime(info["AcquisitionTime"], "%H:%M:%S.%f").strftime(
             "%H%M%S"
         )
         outputname = f"{datedir.stem.replace('_', '')}_{timestamp}"
-
         if "LookLocker" in nii_file.stem:
             outputname += f"_t{info['TriggerDelayTime']}"
+
         nii_file.rename(outputdir / f"{outputname}.nii")
 
 
-def find_sequencedir(studydir: Path, pattern: str) -> Path:
-    paths = [x for x in sorted(studydir.glob("DICOM_*")) if re.match(pattern, x.name)]
+def find_dicom_sequence_dir(dicom_studydir: Path, pattern: str) -> Path:
+    paths = [x for x in sorted(dicom_studydir.glob("DICOM_*")) if re.match(pattern, x.name)]
     if len(paths) == 0:
         raise ValueError(
-            f"No DICOM directory found in {studydir} matching '{pattern}'."
+            f"No DICOM directory found in {dicom_studydir} matching '{pattern}'."
         )
     if len(paths) > 1:
-        logger.warning(
-            f"Multiple DICOM directories found in {studydir} matching '{pattern}': \
-            {paths}".strip(
-                "\t"
-            )
-        )
+        warn = f"Multiple DICOM directories found in {dicom_studydir} matching '{pattern}': {paths}"
+        logger.warning(warn)
     return paths[-1]
-
-
-def is_datedir(dirpath: Path) -> bool:
-    match = re.search("[0-9]{4}_[0-9]{2}_[0-9]{2}", dirpath.stem)
-    if match is None:
-        return False
-    return True
-
-
-def is_niifile(p: Path) -> bool:
-    return p.suffix == ".nii"
 
 
 def find_timestamp_from_dicom(dicom_file: Path) -> Optional[str]:
@@ -94,11 +83,11 @@ def find_timestamp_from_dicom(dicom_file: Path) -> Optional[str]:
     return timestamp
 
 
-def study_iterator(patient_dir: Path) -> list[Path]:
+def study_iterator(dicom_patientdir: Path) -> list[Path]:
     return [
-        x
-        for date in sorted(filter(is_datedir, patient_dir.iterdir()))
-        for x in sorted(date.iterdir())
+        study
+        for date in sorted(filter(is_datedir, dicom_patientdir.iterdir()))
+        for study in sorted(date.iterdir())
     ]
 
 
@@ -110,10 +99,10 @@ if __name__ == "__main__":
         "patientid", type=str, help="Patient ID on format PAT_XXX"
     )
     patient_args, remaining_args = patient_parser.parse_known_args()
-
     paths = patient_data_settings(patientid=patient_args.patientid)
     settings = DICOMSettings(paths=paths)
 
+    """Possible to override defaults."""
     parser = ArgumentParser()
     parser.add_argument("--dicomdir", type=str, default=paths.dicompath)
     parser.add_argument("--t1_outputdir", type=str, default=paths.t1raw)
@@ -122,7 +111,7 @@ if __name__ == "__main__":
     args = parser.parse_args(remaining_args)
 
     patient_dicom2nii(
-        patientdir=args.dicomdir,
+        dicom_patientdir=args.dicomdir,
         t1dir=args.t1_outputdir,
         t2dir=args.t2_outputdir,
         looklockerdir=args.ll_outputdir,

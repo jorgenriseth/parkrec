@@ -17,4 +17,9 @@ For some of the datasets of interest, the sequence name changes between patients
 In some cases, there are even multiple folders/sequences with the same "name-tag", differing only in the numbering (`DICOM_X_Y_[SAMENAME]`):
 <img src="figures/grip-tree-multiple-same-name.png" height=300>
 
-## Desired Output Structure
+## MRI Preprocessing
+
+1. Extract MR-images from DICOM. This is done using the script `multiframe_dicom.py` (assuming the DICOM images are in "multiframe" or "enhanced" format. Otherwise, see the outdated `sort_mri_old.py` for traditional format). The images are extracted in `.nii`-format.
+
+
+### Concentration Estimation

@@ -3,41 +3,46 @@ import logging
 
 from pathlib import Path
 
+from multiframe_dicom import is_niifile
+
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.DEBUG)
 
 
-def is_datetime_dir(path: Path) -> bool:
-    return path.stem.split("_")[0].isdigit() and path.stem.split("_")[1].isdigit()
+def patient_reconstruct(
+    t1_raw_dir: Path,
+    t2_raw_dir: Path,
+    outputdir: Path,
+):
+    outputdir.mkdir(exist_ok=True, parents=False)
 
-
-def is_nii(p: Path) -> bool:
-    return p.suffix == ".nii"
-
-
-def patient_reconstruct(patient_dir: Path, protocol: str = "T1"):
-    volume_dir = patient_dir / "VOLUMES"
-    output_dir = patient_dir / "RESAMPLED"
-    output_dir.mkdir(exist_ok=True, parents=False)
-    for datedir in filter(is_datetime_dir, volume_dir.iterdir()):
-        volume = datedir / "T1.nii"
+    for file in filter(is_niifile, t1_raw_dir.iterdir()):
         subprocess.run(
-            f"mri_convert --conform -odt float {volume} {output_dir/f'{datedir.stem}'}.mgz",
+            f"mri_convert --conform -odt float {file} {outputdir/f'{file.stem}'}.mgz",
             shell=True,
         )
-        # for volume in filter(is_nii, datedir.iterdir()):
-        #     subprocess.run(
-        #         f"mri_convert --conform -odt float {volume} {output_dir/f'{volume.stem}_{datedir.stem}'}.mgz",
-        #         shell=True,
-        #     )
+
+    try:
+        t2 = next(filter(is_niifile, t2_raw_dir.iterdir()))
+        subprocess.run(
+            f"mri_convert --conform -odt float {t2} {outputdir / 'T2.mgz'}",
+            shell=True,
+        )
+    except StopIteration:
+        raise RuntimeError(f"No nii-file found in {t2_raw_dir}")
 
 
 if __name__ == "__main__":
     import argparse
+    from parkrec.settings import patient_data_settings
 
     parser = argparse.ArgumentParser()
     parser.add_argument("patientid", help="Patient ID on the form PAT_XXX")
     args = parser.parse_args()
+    paths = patient_data_settings(patientid=args.patientid)
 
-    inputdir = Path("DATA/") / args.patientid
-    patient_reconstruct(inputdir)
+    patient_reconstruct(
+        paths.t1raw,
+        paths.t2,
+        paths.resampled,
+    )

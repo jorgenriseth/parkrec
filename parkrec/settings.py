@@ -4,12 +4,13 @@ from pydantic import BaseModel, BaseSettings
 
 
 class Settings(BaseSettings):
-    rawdata = Path(__file__).parent / "GRIP"
-    datapath = Path(__file__).parent / "data"
+    rawdata = Path(__file__).parent.parent / "GRIP"
+    datapath = Path(__file__).parent.parent / "data"
 
 
 class PatientDataSettings(BaseModel):
     dicompath: Path
+    datapath: Path
     patient_root: Path
     t1raw: Path
     resampled: Path
@@ -22,7 +23,7 @@ class PatientDataSettings(BaseModel):
     fenics: Path
 
 
-def patient_data_default_settings():
+def patient_data_default_settings() -> dict[str, str]:
     return dict(
         t1raw="T1",
         resampled="RESAMPLED",
@@ -42,6 +43,7 @@ def patient_data_settings(patientid: str) -> PatientDataSettings:
     patient_path = Settings().datapath / patientid
     return PatientDataSettings(
         dicompath=Settings().rawdata / patientid,
+        datapath=Settings().datapath,
         patient_root=patient_path,
         **{data: patient_path / datadir for data, datadir in default.items()}
     )
@@ -49,6 +51,7 @@ def patient_data_settings(patientid: str) -> PatientDataSettings:
 
 class DICOMSettings(BaseModel):
     paths: PatientDataSettings
+    enchanced: bool = True
     patterns: dict[str, str] = {
         "T1": r"(DICOM_\d+_\d+[_ ])(.*(PDT1_3D).*)",
         "T2": r"(DICOM_\d+_\d+[_ ])(.*(TE565).*)",
