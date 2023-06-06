@@ -14,6 +14,7 @@ SEGMENTATION_GROUPS = {
     "hippocampus": [17, 53],
     "amygdala": [18, 54],
     "accumbens": [26, 58],
+    "brainstem": [16]
 }
 
 COLLECTIONS = {

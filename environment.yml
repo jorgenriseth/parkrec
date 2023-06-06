@@ -8,4 +8,6 @@ dependencies:
   - numpy
   - jupyter
   - nibabel
+  - pydicom
+  - scikit-image
   - python=3.11.0
