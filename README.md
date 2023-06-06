@@ -19,7 +19,23 @@ In some cases, there are even multiple folders/sequences with the same "name-tag
 
 ## MRI Preprocessing
 
+All steps are collected into one single script: `mri_preprocessing.py`. Run with
+```bash
+python mri_preprocessing.py PAT_XXX
+```
+
+
 1. Extract MR-images from DICOM. This is done using the script `multiframe_dicom.py` (assuming the DICOM images are in "multiframe" or "enhanced" format. Otherwise, see the outdated `sort_mri_old.py` for traditional format). The images are extracted in `.nii`-format.
 
 
 ### Concentration Estimation
+After the preprocessing steps, ending with registration has been performed, we want to reconstruct concentrations. For this we need to create a refroi-mri using either freeview (according to Bastian's chapter in soon to be available brain-book), or using 3DSlicer. The latter has the advantage of having a flood-fill algorithm making it easy to create a "robust" refroi. The refroi should be stored as `data/PAT_XXX/refroi.nii` (TODO: Make it possible to have both `nii` and `mgz`). This enables normalization:
+```bash
+python parkrec/mriprocessing/normalize_images.py PAT_XXX
+```
+followed by concentration reconstructions:
+```bash
+python estimatec.py [collection of arguments to be better determined]
+```
+
+Finally, the concentrations should be converted fenics-functions using the `mri2fenics.py`-script.

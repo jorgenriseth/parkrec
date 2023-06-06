@@ -2,7 +2,7 @@ from pathlib import Path
 
 import nibabel
 import numpy as np
-import logging 
+import logging
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +32,7 @@ def normalize_image(
 def normalize_subject_images(subject_dir: Path) -> Path:
     registered_dir = subject_dir / "REGISTERED"
     output_dir = subject_dir / "NORMALIZED"
-    refroi_path = subject_dir / "mri" / "refroi.mgz"
+    refroi_path = subject_dir / "refroi.nii"
     if not refroi_path.exists():
         raise OSError(
             f"""{refroi_path} does not exists.
@@ -54,9 +54,10 @@ def normalize_subject_images(subject_dir: Path) -> Path:
 
 if __name__ == "__main__":
     import argparse
+
     parser = argparse.ArgumentParser()
     parser.add_argument("patientid", help="Patient ID on the form PAT_###")
     args = parser.parse_args()
 
-    subject_dir = Path("DATA/") / args.patientid
+    subject_dir = Path("data/") / args.patientid
     normalize_subject_images(subject_dir)

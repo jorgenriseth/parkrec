@@ -16,6 +16,7 @@ class PatientDataSettings(BaseModel):
     resampled: Path
     registered: Path
     lta: Path
+    normalized: Path
     looklocker: Path
     t2: Path
     dti: Path
