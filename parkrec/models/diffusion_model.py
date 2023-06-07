@@ -4,9 +4,13 @@ from typing import Dict, List
 import dolfin as df
 import numpy as np
 import ufl
-from dolfin import (inner, grad)
+from dolfin import inner, grad
 
-from pantarei.boundary import DirichletBoundary, process_dirichlet, IndexedDirichletBoundary
+from pantarei.boundary import (
+    DirichletBoundary,
+    process_dirichlet,
+    IndexedDirichletBoundary,
+)
 from pantarei.fenicsstorage import FenicsStorage
 from pantarei.interpolator import vectordata_interpolator
 from pantarei.timekeeper import TimeKeeper
@@ -19,7 +23,7 @@ def print_progress(t, T, rank=0):
     print(f"[{'=' * progress}{' ' * (40 - progress)}]", end="\r", flush=True)
 
 
-def read_concentration_data(filepath, funcname="cdata") -> List[df.Function]:
+def read_concentration_data(filepath, funcname="data") -> List[df.Function]:
     store = FenicsStorage(filepath, "r")
     tvec = store.read_timevector(funcname)
     c = store.read_function(funcname, idx=0)
@@ -30,14 +34,13 @@ def read_concentration_data(filepath, funcname="cdata") -> List[df.Function]:
 
 
 if __name__ == "__main__":
-
     import argparse
+
     parser = argparse.ArgumentParser()
     parser.add_argument("patientid", help="Patient ID on the form PAT_###")
-    parser.add_argument("resolution", help="SVMTK mesh resolution.", type=int)
     args = parser.parse_args()
 
-    datapath =f"DATA/{args.patientid}/FENICS/cdata_{int(args.resolution)}.hdf"
+    datapath = f"data/{args.patientid}/FENICS/data.hdf"
     timevec, data = read_concentration_data(datapath)
     u0 = data[0].copy(deepcopy=True)
     u_interp = u0.copy(deepcopy=True)
@@ -46,7 +49,6 @@ if __name__ == "__main__":
     V = u0.function_space()
     domain = V.mesh()
 
-
     dt = 3600
     T = timevec[-1]
     time = TimeKeeper(dt=dt, endtime=T)
@@ -54,7 +56,7 @@ if __name__ == "__main__":
     boundaries = [DirichletBoundary(u_interp, "everywhere")]
     bcs = process_dirichlet(V, domain, boundaries)
 
-    D =  1.65e-4  # mm^2/s
+    D = 1.65e-4  # mm^2/s
     dx = df.Measure("dx", V.mesh())
     u = df.TrialFunction(V)
     v = df.TestFunction(V)
@@ -67,7 +69,6 @@ if __name__ == "__main__":
     u.assign(u0)
     storage = FenicsStorage(datapath, "a")
     storage.write_function(u, "diffusion", overwrite=True)
-
 
     time.reset()
     for ti in time:
