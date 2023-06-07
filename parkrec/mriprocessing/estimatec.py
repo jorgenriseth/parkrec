@@ -5,6 +5,8 @@ import numpy
 import nibabel
 import warnings
 
+from parkrec.filters import is_T1_mgz
+
 # Treshold T1 values to range [TMIN, TMAX]
 TMIN, TMAX = 0.2, 4.5 # seconds
 
@@ -109,7 +111,7 @@ if __name__ == "__main__":
     
     os.makedirs(exportfolder, exist_ok=True)
 
-    images = sorted([inputfolder / f for f in os.listdir(parserargs["inputfolder"]) if f.endswith(".mgz")])
+    images = sorted(filter(is_T1_mgz, parserargs["inputfolder"].iterdir()))
 
     print("Loading baseline image", images[0])
 

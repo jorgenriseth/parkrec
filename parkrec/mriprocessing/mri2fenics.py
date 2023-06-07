@@ -63,21 +63,21 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument("patientid", help="PatientID on the form PAT_XXX")
-    parser.add_argument("resolution", type=int, help="Resolution of mesh to use.")
+    parser.add_argument("meshfile", type=str, help="Mesh to use.")
     parser.add_argument("--concentrationdir", type=str, default="CONCENTRATIONS")
-    parser.add_argument("--femfamily", type=str, default="DG")
-    parser.add_argument("--femdegree", type=int, default=0)
+    parser.add_argument("--femfamily", type=str, default="CG")
+    parser.add_argument("--femdegree", type=int, default=1)
     args = parser.parse_args()
 
-    patientdir = Path("DATA") / args.patientid
-    meshfile = patientdir / f"FENICS/brain{args.resolution}.h5"
+    patientdir = Path("data") / args.patientid
+    meshfile = Path(args.meshfile)
 
     from meshprocessing import hdf2fenics
     mesh, _, _ = hdf2fenics(meshfile)
 
     V = df.FunctionSpace(mesh, args.femfamily, args.femdegree)
 
-    output = patientdir / f"FENICS/cdata_{args.resolution}.hdf"
+    output = patientdir / f"FENICS/data.hdf"
     concentration_data = sorted((patientdir / args.concentrationdir).iterdir())#[1:]
     outfile = FenicsStorage(str(output), "w")
     outfile.write_domain(mesh)
@@ -89,6 +89,6 @@ if __name__ == "__main__":
     for cfile in concentration_data:
         c_data_fenics = read_image(filename=cfile, functionspace=V, data_filter=None)
         ti = max(0, (image_timestamp(cfile) - t0).total_seconds())
-        outfile.write_checkpoint(c_data_fenics, name="cdata", t=ti)
+        outfile.write_checkpoint(c_data_fenics, name="data", t=ti)
     outfile.close()
-    fenicsstorage2xdmf(outfile.filepath, "cdata", "cdata")
+    fenicsstorage2xdmf(outfile.filepath, "data", "data")
