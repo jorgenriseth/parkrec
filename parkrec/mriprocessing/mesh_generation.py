@@ -1,12 +1,10 @@
-import subprocess
 import logging
-import meshio
+import subprocess
 from pathlib import Path
 
-import dolfin as df
+from pantarei.meshprocessing import mesh2xdmf, xdmf2hdf
 import SVMTK as svmtk
 
-from meshprocessing import xdmf2hdf, mesh2xdmf
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -23,9 +21,9 @@ def create_patient_mesh(patientdir, resolution):
         if "ventricles" in surface.name:
             continue
         subprocess.run(f"mris_convert {surface} {stl}", shell=True)
-# Should add one of these. Not sure if surf or tkr
-#   --to-surf surfcoords : copy coordinates from surfcoords to output (good for patches)
-#   --to-tkr : convert coordinates from scanner coords to native FS (tkr) coords 
+    # Should add one of these. Not sure if surf or tkr
+    #   --to-surf surfcoords : copy coordinates from surfcoords to output (good for patches)
+    #   --to-tkr : convert coordinates from scanner coords to native FS (tkr) coords
 
     return create_brain_mesh(
         stls,

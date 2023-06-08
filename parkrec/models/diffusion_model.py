@@ -1,16 +1,6 @@
-from pathlib import Path
-from typing import Dict, List
-
 import dolfin as df
-import numpy as np
-import ufl
-from dolfin import inner, grad
-
-from pantarei.boundary import (
-    DirichletBoundary,
-    process_dirichlet,
-    IndexedDirichletBoundary,
-)
+from dolfin import grad, inner
+from pantarei.boundary import DirichletBoundary, process_dirichlet
 from pantarei.fenicsstorage import FenicsStorage
 from pantarei.interpolator import vectordata_interpolator
 from pantarei.timekeeper import TimeKeeper
@@ -23,7 +13,7 @@ def print_progress(t, T, rank=0):
     print(f"[{'=' * progress}{' ' * (40 - progress)}]", end="\r", flush=True)
 
 
-def read_concentration_data(filepath, funcname="data") -> List[df.Function]:
+def read_concentration_data(filepath, funcname="data") -> list[df.Function]:
     store = FenicsStorage(filepath, "r")
     tvec = store.read_timevector(funcname)
     c = store.read_function(funcname, idx=0)

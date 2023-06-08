@@ -1,14 +1,23 @@
-import os
-import pathlib
 import argparse
-import numpy
+import pathlib
+
 import nibabel
-   
+import numpy
+
 parser = argparse.ArgumentParser()
-parser.add_argument('-a', '--aseg', required=True, type=str, 
-    help="FreeSurfer segmentation file aseg.mgz")
-parser.add_argument('--t1', default=None, type=float, 
-    help="Set the voxel valuels inside mask to t1 (create synthetic T1 map). Note: the other scripts use units of seconds")
+parser.add_argument(
+    "-a",
+    "--aseg",
+    required=True,
+    type=str,
+    help="FreeSurfer segmentation file aseg.mgz",
+)
+parser.add_argument(
+    "--t1",
+    default=None,
+    type=float,
+    help="Set the voxel valuels inside mask to t1 (create synthetic T1 map). Note: the other scripts use units of seconds",
+)
 parserargs = parser.parse_args()
 parserargs = vars(parserargs)
 
@@ -26,9 +35,9 @@ aseg = aseg.get_fdata().astype(int)
 csf_mask = numpy.zeros(tuple(aseg.shape), dtype=bool)
 
 for csf_label in csf_labels:
-    csf_mask += (aseg == csf_label) 
+    csf_mask += aseg == csf_label
 
-brainmask = (aseg > 0) * (~ csf_mask)
+brainmask = (aseg > 0) * (~csf_mask)
 
 outfile = pathlib.Path(parserargs["aseg"]).parent / "parenchyma_only.mgz"
 nibabel.save(nibabel.Nifti1Image((brainmask).astype(float), affine), outfile)
@@ -38,4 +47,7 @@ print("freeview ", parserargs["aseg"], " ", outfile)
 
 if parserargs["t1"] is not None:
     outfile = pathlib.Path(parserargs["aseg"]).parent / "synthetic_T1_map.mgz"
-    nibabel.save(nibabel.Nifti1Image((brainmask * parserargs["t1"]).astype(float), affine), outfile)
+    nibabel.save(
+        nibabel.Nifti1Image((brainmask * parserargs["t1"]).astype(float), affine),
+        outfile,
+    )

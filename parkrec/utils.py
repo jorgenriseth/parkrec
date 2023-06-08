@@ -1,20 +1,20 @@
 #!/usr/bin/env/python
 
 import json
+import shutil
+from datetime import datetime
 from functools import partial
 from itertools import chain, repeat
-from datetime import datetime
-from pathlib import Path
 from multiprocessing.pool import Pool
-from typing import Tuple, Iterator, Dict
+from pathlib import Path
+from typing import Iterator
 
-import shutil
 import pydicom
 
 
 def create_protocol_filemap(
-    input_dir: Path, output_dir: Path, sequences: Dict[str, str], n_jobs=None
-) -> Dict[Path, Path]:
+    input_dir: Path, output_dir: Path, sequences: dict[str, str], n_jobs=None
+) -> dict[Path, Path]:
     """Runs through the folder structure with the MRI data we receive from the hospital, and creates a dictionary mapping a src-path sorts them according to
     'patient - study_datetime - protocol'. Runs in parallel for each of the studies."""
     pool = Pool(n_jobs)
@@ -28,8 +28,8 @@ def create_protocol_filemap(
 
 
 def create_study_filemap(
-    study_dir: Path, output_dir: Path, sequences: Dict[str, str]
-) -> Dict[Path, Path]:
+    study_dir: Path, output_dir: Path, sequences: dict[str, str]
+) -> dict[Path, Path]:
     date_dir = study_dir.parent
     patient = date_dir.parent.stem
     study_data = study_dir / "DICOM" / "DICOM"
@@ -68,13 +68,13 @@ def study_imfiles(study_data_path: Path) -> Iterator[Path]:
     )
 
 
-def study_imfiles_in_dicomdir(study_data_path: Path) -> Iterator[Tuple[Path, int]]:
+def study_imfiles_in_dicomdir(study_data_path: Path) -> Iterator[tuple[Path, int]]:
     return zip(filter(is_imfile, study_data_path.iterdir()), repeat(0))
 
 
 def study_imfiles_in_dicom_subdir(
     study_subdir_path: Path,
-) -> Iterator[Tuple[Path, int]]:
+) -> Iterator[tuple[Path, int]]:
     return zip(
         filter(is_imfile, study_subdir_path.iterdir()),
         repeat(int(study_subdir_path.stem)),

@@ -14,7 +14,7 @@ SEGMENTATION_GROUPS = {
     "hippocampus": [17, 53],
     "amygdala": [18, 54],
     "accumbens": [26, 58],
-    "brainstem": [16]
+    "brainstem": [16],
 }
 
 COLLECTIONS = {
@@ -41,7 +41,7 @@ COLLECTIONS = {
         "hippocampus",
         "amygdala",
         "accumbens",
-    ]
+    ],
 }
 
 
@@ -66,4 +66,5 @@ def invert_seg_groups(seg_groups):
 
 if __name__ == "__main__":
     import json
+
     print(json.dumps(default_segmentation_groups(), indent=4))

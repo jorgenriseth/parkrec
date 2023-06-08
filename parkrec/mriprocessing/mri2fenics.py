@@ -1,20 +1,22 @@
-import dolfin as df
+import argparse
+
 # from dolfin_adjoint import *
 import datetime
+import logging
+from pathlib import Path
+from typing import List
+
+import dolfin as df
+
 # from datetime import datetime
 import nibabel
 import numpy
 from nibabel.affines import apply_affine
-import argparse
-from pathlib import Path
-
-import logging
 from pantarei.fenicsstorage import FenicsStorage
-from typing import List
-
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
+
 
 def read_image(filename, functionspace, data_filter=None):
     mri_volume = nibabel.load(filename)
@@ -26,23 +28,39 @@ def read_image(filename, functionspace, data_filter=None):
     xyz = functionspace.tabulate_dof_coordinates()
     ijk = apply_affine(ras2vox_tkr_inv, xyz).T
     i, j, k = numpy.rint(ijk).astype("int")
-    
+
     if data_filter is not None:
         voxeldata = data_filter(voxeldata, ijk, i, j, k)
         c_data.vector()[:] = voxeldata[i, j, k]
     else:
-        if numpy.where(numpy.isnan(voxeldata[i, j, k]), 1,0).sum() > 0:
-            print("No filter used, setting", numpy.where(numpy.isnan(voxeldata[i, j, k]), 1, 0).sum(), "/", i.size, " nan voxels to 0")
-            voxeldata[i, j, k] = numpy.where(numpy.isnan(voxeldata[i, j, k]), 0, voxeldata[i, j, k])
-        if numpy.where(voxeldata[i, j, k] < 0, 1,0).sum() > 0:
-            print("No filter used, setting", numpy.where(voxeldata[i, j, k] < 0, 1, 0).sum(), "/", i.size, " voxels in mesh have value < 0")
+        if numpy.where(numpy.isnan(voxeldata[i, j, k]), 1, 0).sum() > 0:
+            print(
+                "No filter used, setting",
+                numpy.where(numpy.isnan(voxeldata[i, j, k]), 1, 0).sum(),
+                "/",
+                i.size,
+                " nan voxels to 0",
+            )
+            voxeldata[i, j, k] = numpy.where(
+                numpy.isnan(voxeldata[i, j, k]), 0, voxeldata[i, j, k]
+            )
+        if numpy.where(voxeldata[i, j, k] < 0, 1, 0).sum() > 0:
+            print(
+                "No filter used, setting",
+                numpy.where(voxeldata[i, j, k] < 0, 1, 0).sum(),
+                "/",
+                i.size,
+                " voxels in mesh have value < 0",
+            )
 
         c_data.vector()[:] = voxeldata[i, j, k]
 
     return c_data
 
+
 def image_timestamp(p: Path) -> datetime.datetime:
     return datetime.datetime.strptime(p.stem, "%Y%m%d_%H%M%S")
+
 
 def injection_timestamp(injection_time_file: Path) -> datetime:
     with open(injection_time_file, "r") as f:
@@ -55,11 +73,13 @@ def fenicsstorage2xdmf(filepath, funcname: str, subnames: str | List[str]) -> No
     file.to_xdmf(funcname, subnames)
     file.close()
 
+
 if __name__ == "__main__":
     import argparse
     from pathlib import Path
+
     from pantarei.fenicsstorage import FenicsStorage
-    import pantarei as pr
+    from parkrec.mriprocessing.meshprocessing import hdf2fenics
 
     parser = argparse.ArgumentParser()
     parser.add_argument("patientid", help="PatientID on the form PAT_XXX")
@@ -72,13 +92,12 @@ if __name__ == "__main__":
     patientdir = Path("data") / args.patientid
     meshfile = Path(args.meshfile)
 
-    from meshprocessing import hdf2fenics
     mesh, _, _ = hdf2fenics(meshfile)
 
     V = df.FunctionSpace(mesh, args.femfamily, args.femdegree)
 
     output = patientdir / f"FENICS/data.hdf"
-    concentration_data = sorted((patientdir / args.concentrationdir).iterdir())#[1:]
+    concentration_data = sorted((patientdir / args.concentrationdir).iterdir())  # [1:]
     outfile = FenicsStorage(str(output), "w")
     outfile.write_domain(mesh)
 

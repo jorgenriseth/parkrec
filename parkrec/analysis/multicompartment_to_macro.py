@@ -1,8 +1,10 @@
-from pantarei.fenicsstorage import FenicsStorage, delete_dataset
-from multidiffusion_model import get_default_coefficients, print_progress
-import dolfin as df
-
 import logging
+
+import dolfin as df
+from pantarei.fenicsstorage import FenicsStorage
+
+from parkrec.models.multidiffusion_model import get_default_coefficients, print_progress
+
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 df.set_log_level(df.LogLevel.WARNING)
@@ -20,13 +22,17 @@ if __name__ == "__main__":
 
     logger.info(f"Computing macroscopic concentration at t={timevec[0]}")
     c = df.Function(u.function_space().sub(0).collapse())
-    c.vector()[:] = sum([phi[j] * uj.vector() for j, uj in enumerate(u.split(deepcopy=True))])
+    c.vector()[:] = sum(
+        [phi[j] * uj.vector() for j, uj in enumerate(u.split(deepcopy=True))]
+    )
     storage.write_function(c, "/multidiffusion_total", overwrite=True)
 
     for idx, ti in enumerate(timevec[1:]):
         print_progress(float(ti), timevec[-1], rank=df.MPI.comm_world.rank)
-        u = storage.read_checkpoint(u, "multidiffusion", idx=idx+1)
-        c.vector()[:] = sum([phi[j] * uj.vector() for j, uj in enumerate(u.split(deepcopy=True))])
+        u = storage.read_checkpoint(u, "multidiffusion", idx=idx + 1)
+        c.vector()[:] = sum(
+            [phi[j] * uj.vector() for j, uj in enumerate(u.split(deepcopy=True))]
+        )
         storage.write_checkpoint(c, "/multidiffusion_total", ti)
     storage.close()
 

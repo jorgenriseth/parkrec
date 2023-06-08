@@ -1,16 +1,14 @@
 from pathlib import Path
 from typing import Optional
 
+import matplotlib.pyplot as plt
 import nibabel
 import numpy as np
-import matplotlib.pyplot as plt
 import skimage
-
-from parkrec.mriprocessing import t1maps
-from parkrec.settings import patient_data_settings
-from parkrec.analysis import seg_groups
-
 from pint import UnitRegistry
+
+from parkrec.analysis import seg_groups
+from parkrec.settings import patient_data_settings
 
 # Define units
 ureg = UnitRegistry()
