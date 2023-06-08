@@ -1,36 +1,33 @@
-import subprocess
 import logging
-import meshio
+import subprocess
 from pathlib import Path
 
-import dolfin as df
+from pantarei.meshprocessing import mesh2xdmf, xdmf2hdf
 import SVMTK as svmtk
 
-from meshprocessing import xdmf2hdf, mesh2xdmf
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
 def create_patient_mesh(patientdir, resolution):
-    fenics_path = patientdir / "FENICS"
-    fenics_path.mkdir(exist_ok=True)
+    meshpath = patientdir / "MESH"
+    meshpath.mkdir(exist_ok=True)
     surfaces = ("lh.pial", "rh.pial", "lh.white", "rh.white", "ventricles")
     surfaces = [patientdir / "surf" / surf for surf in surfaces]
-    stls = [fenics_path / f"{surf.name}.stl" for surf in surfaces]
+    stls = [meshpath / f"{surf.name}.stl" for surf in surfaces]
 
     for surface, stl in zip(surfaces, stls):
         if "ventricles" in surface.name:
             continue
         subprocess.run(f"mris_convert {surface} {stl}", shell=True)
-# Should add one of these. Not sure if surf or tkr
-#   --to-surf surfcoords : copy coordinates from surfcoords to output (good for patches)
-#   --to-tkr : convert coordinates from scanner coords to native FS (tkr) coords 
+    # Should add one of these. Not sure if surf or tkr
+    #   --to-surf surfcoords : copy coordinates from surfcoords to output (good for patches)
+    #   --to-tkr : convert coordinates from scanner coords to native FS (tkr) coords
 
     return create_brain_mesh(
-
         stls,
-        fenics_path / f"brain{resolution}.mesh",
+        meshpath / f"brain{resolution}.mesh",
         resolution,
         remove_ventricles=True,
     )
@@ -38,7 +35,7 @@ def create_patient_mesh(patientdir, resolution):
 
 def create_ventricle_surface(patientdir):
     input = patientdir / "mri/wmparc.mgz"
-    output = patientdir / "FENICS/ventricles.stl"
+    output = patientdir / "MESH/ventricles.stl"
     if not output.exists():
         subprocess.run(
             f"bash scripts/extract-ventricles.sh {input} {output}", shell=True
@@ -80,11 +77,10 @@ def create_brain_mesh(stls, output, resolution=32, remove_ventricles=True):
 
     # Save mesh
     domain.save(str(output))
-    #subprocess.run(f"meshio convert {output} {output.with_suffix('.xdmf')}", shell=True)
-    xdmfdir = patientdir / "FENICS/mesh_xdmf"
+    xdmfdir = patientdir / "MESH/xdmf"
     xdmfdir.mkdir(exist_ok=True)
     mesh2xdmf(output, xdmfdir)
-    return xdmf2hdf(xdmfdir, output.with_suffix(".h5"))
+    return xdmf2hdf(xdmfdir, output.with_suffix(".hdf"))
 
 
 if __name__ == "__main__":

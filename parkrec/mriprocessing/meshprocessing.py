@@ -1,17 +1,26 @@
 #!/usr/bin/env python
-import glob
-import os
 import logging
 from dataclasses import dataclass
 from pathlib import Path
 
 import meshio
-import SVMTK as svmtk
 from dolfin import HDF5File, Mesh, MeshFunction, MeshValueCollection, XDMFFile
 from dolfin.cpp.mesh import MeshFunctionSizet
 
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class Domain:
+    mesh: Mesh
+    subdomains: MeshFunctionSizet
+    boundaries: MeshFunctionSizet
+
+
+def unpack_domain(domain: Domain):
+    return domain.mesh, domain.subdomains, domain.boundaries
+
 
 def mesh2xdmf(meshfile, xdmfdir):
     mesh = meshio.read(meshfile)
@@ -29,9 +38,13 @@ def meshio2xdmf(mesh, xdmfdir):
     meshdata = meshio.Mesh(points, polytopes)
     meshio.write("{}/mesh.xdmf".format(xdmfdir), meshdata)
     if "gmsh:physical" or "medit:ref" in mesh.cell_data_dict:
-        cell_data_name = "gmsh:physical" if "gmsh:physical" in mesh.cell_data_dict else "medit:ref"
+        cell_data_name = (
+            "gmsh:physical" if "gmsh:physical" in mesh.cell_data_dict else "medit:ref"
+        )
         # Write the subdomains of the mesh
-        subdomains = {"subdomains": [mesh.cell_data_dict[cell_data_name][polytope_label]]}
+        subdomains = {
+            "subdomains": [mesh.cell_data_dict[cell_data_name][polytope_label]]
+        }
         subdomainfile = meshio.Mesh(points, polytopes, cell_data=subdomains)
         meshio.write("{}/subdomains.xdmf".format(xdmfdir), subdomainfile)
 
@@ -71,8 +84,8 @@ def xdmf2hdf(xdmfdir, hdf5file):
 
 
 def hdf2fenics(hdf5file, pack=False):
-    """ Function to read h5-file with annotated mesh, subdomains
-    and boundaries into fenics mesh """
+    """Function to read h5-file with annotated mesh, subdomains
+    and boundaries into fenics mesh"""
     mesh = Mesh()
     with HDF5File(mesh.mpi_comm(), str(hdf5file), "r") as hdf:
         hdf.read(mesh, "/domain/mesh", False)
@@ -87,14 +100,3 @@ def hdf2fenics(hdf5file, pack=False):
         return Domain(mesh, subdomains, boundaries)
 
     return mesh, subdomains, boundaries
-
-
-@dataclass
-class Domain:
-    mesh: Mesh
-    subdomains: MeshFunctionSizet
-    boundaries: MeshFunctionSizet
-
-
-def unpack_domain(domain: Domain):
-    return domain.mesh, domain.subdomains, domain.boundaries

@@ -1,14 +1,14 @@
+import logging
 from pathlib import Path
 
 import nibabel
 import numpy as np
-import logging
+
+from parkrec import filters
+
+
 
 logger = logging.getLogger(__name__)
-
-
-def is_not_template(p: Path) -> bool:
-    return p.suffix == ".mgz" and p.stem != "template"
 
 
 def normalize_image(
@@ -44,7 +44,7 @@ def normalize_subject_images(subject_dir: Path) -> Path:
     refroi_affine = refroi.affine
     refroi_mask = refroi.get_fdata().astype(bool)
 
-    images = sorted(filter(is_not_template, registered_dir.iterdir()))
+    images = sorted(filter(filters.is_T1_mgz, registered_dir.iterdir()))
     for imagepath in images:
         logger.info("Normalizing image {imagepath}")
         normalize_image(imagepath, refroi_mask, refroi_affine, output_dir)

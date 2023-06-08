@@ -1,10 +1,11 @@
-import pandas as pd
 import logging
-import numpy as np
-import nibabel
 import re
 from datetime import datetime
 from pathlib import Path
+
+import nibabel
+import numpy as np
+import pandas as pd
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

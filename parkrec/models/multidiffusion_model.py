@@ -1,27 +1,25 @@
+import logging
 import time as pytime
 from pathlib import Path
-from typing import Dict, List, Any
+from typing import Any
 
 import dolfin as df
-import numpy as np
 import ufl
-from dolfin import inner, grad
-
-
-import logging
-logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO)
-df.set_log_level(df.LogLevel.WARNING)
-
+from dolfin import grad, inner
 from pantarei.boundary import (
     DirichletBoundary,
-    process_dirichlet,
     indexed_boundary_conditions,
+    process_dirichlet,
 )
 from pantarei.fenicsstorage import FenicsStorage, delete_dataset
 from pantarei.interpolator import vectordata_interpolator
 from pantarei.timekeeper import TimeKeeper
 from pantarei.utils import assign_mixed_function
+
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
+df.set_log_level(df.LogLevel.WARNING)
 
 
 def print_progress(t, T, rank=0):
@@ -31,7 +29,7 @@ def print_progress(t, T, rank=0):
     print(f"[{'=' * progress}{' ' * (40 - progress)}]", end="\r", flush=True)
 
 
-def read_concentration_data(filepath) -> List[df.Function]:
+def read_concentration_data(filepath) -> list[df.Function]:
     store = FenicsStorage(filepath, "r")
     tvec = store.read_timevector("cdata")
     c = store.read_function("cdata", idx=0)
@@ -40,23 +38,25 @@ def read_concentration_data(filepath) -> List[df.Function]:
         store.read_checkpoint(C[idx], "cdata", idx)
     return tvec, C
 
+
 def read_function_element(filepath, funcname) -> df.FunctionSpace:
     store = FenicsStorage(filepath, "r")
     el = store.read_element(funcname)
     store.close()
     return el
 
+
 def compartment_form(
     idx_j: int,
     u: ufl.Argument,
     v: ufl.Argument,
     c0: df.Function,
-    D: Dict[str, float],
-    phi: Dict[str, float],
+    D: dict[str, float],
+    phi: dict[str, float],
     alpha: float,
-    P: float, 
-    compartments: List[str],
-    dt: float
+    P: float,
+    compartments: list[str],
+    dt: float,
 ) -> df.Form:
     j = compartments[idx_j]
     sj = sum(
@@ -66,18 +66,17 @@ def compartment_form(
             if idx_i != idx_j
         ]
     )
-    return (
-        (u[idx_j] - c0[idx_j] - dt * sj) * v[idx_j] 
-        + dt * inner(D[j] * grad(u[idx_j]), grad(v[idx_j]))
+    return (u[idx_j] - c0[idx_j] - dt * sj) * v[idx_j] + dt * inner(
+        D[j] * grad(u[idx_j]), grad(v[idx_j])
     )
 
 
 def multicomp_diffusion_form(
     V: df.FunctionSpace,
-    coefficients: Dict[str, Any],
+    coefficients: dict[str, Any],
     c0: df.Function,
-    compartments: List[str],
-    dt: float
+    compartments: list[str],
+    dt: float,
 ) -> df.Form:
     dx = df.Measure("dx", domain=V.mesh())
     u = df.TrialFunction(V)
@@ -97,16 +96,13 @@ def multicomp_diffusion_form(
     )
 
 
-def get_default_coefficients() -> Dict[str, Any]:
+def get_default_coefficients() -> dict[str, Any]:
     return {
         "porosity": {
             "ecs": 0.14,
             "pvs": 0.01,
         },
-        "diffusion_coefficient": {
-            "ecs": 3.4e-4,
-            "pvs": 3.4e-3
-        },
+        "diffusion_coefficient": {"ecs": 3.4e-4, "pvs": 3.4e-3},
         "alpha": 5.0,
         "permeability": 8.3e-5,
     }
@@ -126,14 +122,11 @@ def main(compartments, coefficients, inputfile, outputfile=None):
     V = df.FunctionSpace(domain, element)
 
     dt = 3600
-    T = timevec[-1] 
+    T = timevec[-1]
     time = TimeKeeper(dt=dt, endtime=T)
 
     # Define boundary conditions
-    u_interp = {
-        compartment: c0.copy(deepcopy=True)
-        for compartment in compartments
-    }
+    u_interp = {compartment: c0.copy(deepcopy=True) for compartment in compartments}
     phi = coefficients["porosity"]
     phi_tot = sum(phi.values())
     for val in u_interp.values():
@@ -157,7 +150,7 @@ def main(compartments, coefficients, inputfile, outputfile=None):
     u.assign(u0)
     storage = FenicsStorage(outputfile, "a")
     storage.write_function(u, "multidiffusion", overwrite=True)
- 
+
     logger.info("Starting time loop...")
     tic = pytime.time()
     time.reset()
@@ -183,6 +176,7 @@ def main(compartments, coefficients, inputfile, outputfile=None):
 
 if __name__ == "__main__":
     import argparse
+
     parser = argparse.ArgumentParser()
     parser.add_argument("patientid", help="Patient ID on the form PAT_###")
     parser.add_argument("resolution", help="SVMTK mesh resolution.", type=int)
@@ -192,7 +186,7 @@ if __name__ == "__main__":
     compartments = ["ecs", "pvs"]
     coefficients = get_default_coefficients()
 
-    results_path = main(compartments, coefficients, data_file) 
+    results_path = main(compartments, coefficients, data_file)
 
     logger.info("Writing XDMF files for each compartment.")
     file = FenicsStorage(results_path, "r")
